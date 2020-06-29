@@ -3,7 +3,7 @@
 ### NEEDED PROGRAMS
 
      (1) IAR 1.0.7 (link soon)
-     (2) BinEncode (link soon)
+     (2) BinEncode (https://raw.githubusercontent.com/makerbase-mks/Software/master/binEncode/binEncode_setup.zip)
      
 ### BUILDING
  (1) Download and unzip the repo
