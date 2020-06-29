@@ -1,18 +1,19 @@
-# MKS-TFT35-Firmware
-### MKS-TFT35-Firmware 1.0.7
+# HOW TO BUILD YOUR OWN FIRMWARE
 
-     (1) Add support for UPS power failure detection module
-     (2) Fix the bug that the preview of Gcode files in the file directory shows abnormal
-     (3) Fixed the bug of abnormal WiFi transmission and abnormal transmission with file name and Chinese gcode
-     (4) Increase wifi password setting length
+### NEEDED PROGRAMS
+
+     (1) IAR 1.0.7 (link soon)
+     (2) BinEncode (link soon)
      
-### MKS-TFT35-Firmware 1.0.6
- (1) Add wifi scan mode
+### BUILDING
+ (1) Download and unzip the repo
  
- (2) Add most of the configuration parameters in the online configuration configuration file
+ (2) Open the repo folder and go to EWARM inside this map there is a file you can open with IAR called mkstft35.eww.
  
- (3) Add Marin firmware online parameter adjustment function, can configure basic parameters such as pulse, TMC drive current,          acceleration, probe offset, etc.
+ (3) Inside IAR go to Project and push on Rebuild All this can take a while when its done you can modify the code. 
  
- (4) Add Gcode console display
+ (4) IF you modified the code you need to push again on Rebuild All.
  
- (5) Added on-screen text reminder function when out of stock
+ (5) When its done go to BinEncode, push on scan and go to EWARM > mkstft35 > Exe here you can see the mkstft35.bin open it and push on Encode
+ 
+ (6) Now the encoded file is inside the folder Windows > BinEncode The file called Robin_nano35.bin rename it to mkstft35 and its ready to flash!
