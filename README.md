@@ -16,4 +16,4 @@
  
  (5) When its done go to BinEncode, push on scan and go to EWARM > mkstft35 > Exe here you can see the mkstft35.bin open it and push on Encode
  
- (6) Now the encoded file is inside the folder Windows > BinEncode The file called Robin_nano35.bin rename it to mkstft35 and its ready to flash!
+ (6) Now the encoded file is inside the folder Windows > BinEncode The file called Robin_nano35.bin rename it to mkstft35.bin and its ready to flash!
