@@ -4,7 +4,6 @@
 
      (1) IAR 1.0.7 https://wetransfer.com/downloads/f660a1486cdeacf99ad12d5a77a8e29b20200812083359/f5d9ecbb9873b12d163addf1fcfa98f920200812083414/ec5732
      (2) BinEncode (https://raw.githubusercontent.com/makerbase-mks/Software/master/binEncode/binEncode_setup.zip)
-     https://wetransfer.com/downloads/64a3b8078fb84c2f809ebd6a2683e8eb20200812090635/38034f5bbfedda7db1e2629167cad80620200812090648/40574e
      
 ### BUILDING
  (1) Download and unzip the repo
