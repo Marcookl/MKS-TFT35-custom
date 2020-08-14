@@ -11,6 +11,7 @@
 #include "mks_tft_com.h"
 #ifndef GUI_FLASH
 #define GUI_FLASH
+#include "draw_move_motor.h"
 #endif
 
 GUI_HWIN hZoffsetWnd;
@@ -43,7 +44,7 @@ static void cbZoffsetWin(WM_MESSAGE * pMsg) {
 			{
 				if(pMsg->hWinSrc == buttonStep01.btnHandle)
 				{
-					gCfgItems.stepZoffset=0.01;
+					gCfgItems.stepZoffset=0.01 ;
 					disp_step_zoffset();					
 				}
 				else if(pMsg->hWinSrc == buttonStep05.btnHandle)
@@ -61,11 +62,19 @@ static void cbZoffsetWin(WM_MESSAGE * pMsg) {
 				{
 					gCfgItems.Zoffset += gCfgItems.stepZoffset;
 					if((gCfgItems.Zoffset>(-0.001))&&(gCfgItems.Zoffset<0.001))
-						gCfgItems.Zoffset = 0;
+                                          
+                                        //////printf(RELATIVE_COORD_COMMAN);
+					pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)RELATIVE_COORD_COMMAN);
+					sprintf(buf, "G1 Z%.2f\n", gCfgItems.stepZoffset,  gCfgItems.moveSpeed);
+					//////printf(buf);
+					pushFIFO(&gcodeCmdTxFIFO,(unsigned char *) buf);
+					////////printf(ABSOLUTE_COORD_COMMAN);
+					pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)ABSOLUTE_COORD_COMMAN);
+                                        
 					if(gCfgItems.firmware_type == 1)
 						sprintf(buf, "M851 Z%.2f\n", gCfgItems.Zoffset);
 					else
-						sprintf(buf, "M565 Z%.2f\n", gCfgItems.Zoffset);						
+						sprintf(buf, "M565 Z%.2f\n", gCfgItems.Zoffset);
 					pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)buf);
 					memset(buf,0,sizeof(buf));
 					sprintf(buf, "M500\n");
@@ -77,12 +86,18 @@ static void cbZoffsetWin(WM_MESSAGE * pMsg) {
 				{
 					gCfgItems.Zoffset -= gCfgItems.stepZoffset;
 					if((gCfgItems.Zoffset>(-0.001))&&(gCfgItems.Zoffset<0.001))
-						gCfgItems.Zoffset = 0;
+                                        //////printf(RELATIVE_COORD_COMMAN);
+					pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)RELATIVE_COORD_COMMAN);
+					sprintf(buf, "G1 Z%.2f\n", (float)0 - gCfgItems.stepZoffset,  gCfgItems.moveSpeed);
+					//////printf(buf);
+					pushFIFO(&gcodeCmdTxFIFO,(unsigned char *) buf);
+					////////printf(ABSOLUTE_COORD_COMMAN);
+					pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)ABSOLUTE_COORD_COMMAN);
 					
 					if(gCfgItems.firmware_type == 1)
 						sprintf(buf, "M851 Z%.2f\n", gCfgItems.Zoffset);
 					else
-						sprintf(buf, "M565 Z%.2f\n", gCfgItems.Zoffset);						
+						sprintf(buf, "M851 Z%.2f\n", gCfgItems.Zoffset);	
 					pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)buf);
 					memset(buf,0,sizeof(buf));
 					sprintf(buf, "M500\n");
@@ -91,8 +106,9 @@ static void cbZoffsetWin(WM_MESSAGE * pMsg) {
 					disp_zoffset();
 				}
 				else  if(pMsg->hWinSrc == buttonRet.btnHandle)
-				{
-					last_disp_state = ZOFFSET_UI;
+				{		
+                                        
+					last_disp_state = ZOFFSET_UI;  
 					Clear_Zoffset();
 					draw_return_ui();
 					
@@ -100,7 +116,7 @@ static void cbZoffsetWin(WM_MESSAGE * pMsg) {
 			}
 			break;
 			
-		default:
+		default:        
 			WM_DefaultProc(pMsg);
 		}
 	}
@@ -108,6 +124,9 @@ static void cbZoffsetWin(WM_MESSAGE * pMsg) {
 
 void draw_Zoffset()
 {
+        gCfgItems.Zoffset = pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)GET_BABY_ZOFFSET_COMMAND);
+        gCfgItems.Zoffset = pushFIFO(&gcodeCmdRxFIFO, (unsigned char *)GET_BABY_ZOFFSET_COMMAND);
+        
 	if(disp_state_stack._disp_state[disp_state_stack._disp_index] != ZOFFSET_UI)
 	{
 		disp_state_stack._disp_index++;
@@ -198,9 +217,6 @@ void Clear_Zoffset()
 void disp_step_zoffset()
 {
 
-
-
-
 	if(gCfgItems.stepZoffset*100 == 1)
 	{
 		BUTTON_SetBkColor(buttonStep01.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_state_sel_color);
@@ -268,27 +284,30 @@ void disp_step_zoffset()
 	{
 
 		BUTTON_SetText(buttonStep01.btnHandle,zoffset_menu.step001);	
-		BUTTON_SetText(buttonStep05.btnHandle,zoffset_menu.step01);
+		BUTTON_SetText(buttonStep05.btnHandle,zoffset_menu.step01);     
 		BUTTON_SetText(buttonStep1.btnHandle,zoffset_menu.step1);	
 
 	}	
+        
+  
+  
 }
+
+
 
 void disp_zoffset()
 {
-	char buf[20] = {0};
-	char buf1[20] = {0};
-	
+    	char buf[20] = {0};
+	char buf1[20] = {0};        
+        
 	TEXT_SetBkColor(textZoffset,gCfgItems.state_background_color);
 	TEXT_SetBkColor(textZoffsetValue,gCfgItems.state_background_color); 
 	TEXT_SetTextColor(textZoffset,gCfgItems.state_text_color);
 	TEXT_SetTextColor(textZoffsetValue,gCfgItems.state_text_color);
 	
 	sprintf(buf1,"z offset");
-	sprintf(buf, "%.2f",gCfgItems.Zoffset);
-
-
+        sprintf(buf, "Z%.2f\n", gCfgItems.Zoffset);
+         
 	TEXT_SetText(textZoffset, buf1);
 	TEXT_SetText(textZoffsetValue, buf);
 }
-
