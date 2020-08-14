@@ -6,7 +6,7 @@
 #include "fontLib.h"
 #include "LISTBOX.h"
 #include "draw_disk.h"
-
+#include "draw_move_motor.h"
 #include "draw_machine.h"
 #include "draw_log_ui.h"
 #include "draw_language.h"
@@ -19,10 +19,10 @@
 #include "draw_print_file.h"
 #include "draw_filamentchange.h"
 #include "draw_manual_leveling.h"
-//lan
-#include "draw_wifi_list.h"
-#include "wifi_module.h"
-#include "draw_ready_print.h"
+#include "draw_zoffset.h"
+#include "mks_tft_fifo.h"
+#include "mks_cfg.h"
+
 
 #ifndef GUI_FLASH
 #define GUI_FLASH
@@ -34,21 +34,22 @@ extern uint8_t Get_Temperature_Flg;
 extern volatile uint8_t get_temp_flag;
 extern GUI_FLASH const GUI_FONT GUI_FontHZ_fontHz18;
 
-extern uint8_t command_send_flag;//lan
-
+extern TFT_FIFO gcodeCmdTxFIFO;		//gcode 指令发送队列
+extern TFT_FIFO gcodeCmdRxFIFO;		//gcode	指令接收队列
 extern volatile char *codebufpoint;
 extern char cmd_code[201];
 extern int X_ADD,X_INTERVAL;   //**图片间隔
 extern uint32_t choose_ret;
 extern uint8_t disp_in_file_dir;
 	
-static BUTTON_STRUCT buttonMachinePara, buttonVarify, buttonMachine, buttonConnect, buttonWifi, buttonLanguage, buttonAbout, buttonFunction_1,buttonFunction_2,buttonFunction_3,buttonRet,buttonFilamentChange,buttonFan,buttonBreakpoint;
+static BUTTON_STRUCT buttonDisk, buttonVarify, buttonMachine, buttonConnect, buttonWifi, buttonLanguage, buttonAbout, buttonFunction_1,buttonFunction_2,buttonFunction_3,buttonRet,buttonFan,buttonBreakpoint,buttonzoffset;
 
 static void cbSetWin(WM_MESSAGE * pMsg) {
+char  buf[50] = {0};
+char buf3[10] = {0};
 
 	uint16_t i=0;
 	uint8_t *funcbuff;
-	char buf[6]={0};//lan
 	
 	struct PressEvt *press_event;
 	switch (pMsg->MsgId)
@@ -74,8 +75,8 @@ static void cbSetWin(WM_MESSAGE * pMsg) {
 				{
 					last_disp_state = SET_UI;
 					Clear_Set();
-//					draw_return_ui();
-					draw_ready_print();
+					draw_return_ui();
+					
 				}			
 				#if 0
 				else if(pMsg->hWinSrc == buttonVarify.btnHandle)
@@ -87,12 +88,14 @@ static void cbSetWin(WM_MESSAGE * pMsg) {
 
 				}
 				#endif	
-//				else if(pMsg->hWinSrc == buttonMachinePara.btnHandle)
-//				{
-//					last_disp_state = SET_UI;
-//					Clear_Set();
-//					draw_Disk();
-//				}
+				else if(pMsg->hWinSrc == buttonzoffset.btnHandle)
+				{       
+                                        gCfgItems.Zoffset = pushFIFO(&gcodeCmdTxFIFO, (unsigned char *)GET_BABY_ZOFFSET_COMMAND);
+                                        gCfgItems.Zoffset = pushFIFO(&gcodeCmdRxFIFO, (unsigned char *)GET_BABY_ZOFFSET_COMMAND);
+					last_disp_state = SET_UI;
+					Clear_Set();
+					draw_Zoffset();
+				}
 				else if(pMsg->hWinSrc == buttonVarify.btnHandle)
 				{
 					last_disp_state = SET_UI;
@@ -114,62 +117,10 @@ static void cbSetWin(WM_MESSAGE * pMsg) {
 				}
 				else if(pMsg->hWinSrc == buttonWifi.btnHandle)
 				{
-//					last_disp_state = SET_UI;
-//					Clear_Set();
-//					draw_Wifi();
-					//lan
-					if(gCfgItems.wifi_scan == 1)
-					{
-						if(wifi_link_state == WIFI_CONNECTED && wifiPara.mode != 0x01)//sta mode
-						{
-							//wifi_list.nameIndex = wifi_list.nameIndex + i;
-							last_disp_state = SET_UI;
-							Clear_Set();
-							//draw_WifiConnected();
-							draw_Wifi();
-						}
-						else//ap
-						{
-							if(command_send_flag == 1)
-							{
-								buf[0] = 0xA5;
-								buf[1] = 0x07;
-								buf[2] = 0x00;
-								buf[3] = 0x00;
-								buf[4] = 0xFC;
-								raw_send_to_wifi(buf, 5);
-							
-								last_disp_state = SET_UI;
-								Clear_Set();
-								draw_Wifi_list();
-							}
-							else
-							{
-								last_disp_state = SET_UI;
-								Clear_Set();
-								draw_dialog(WIFI_ENABLE_TIPS);
-							}
-						}
-					}
-					else 
-					{
-						last_disp_state = SET_UI;
-						Clear_Set();
-						draw_Wifi();
-					}
-
-				}
-				else if(pMsg->hWinSrc == buttonFilamentChange.btnHandle)
-				{
-					/*last_disp_state = SET_UI;
-					Clear_Set();
-					draw_FilamentChange();*/
 					last_disp_state = SET_UI;
-					Get_Temperature_Flg = 1;
-					get_temp_flag = 1;
 					Clear_Set();
-					draw_FilamentChange();
-				}				
+					draw_Wifi();
+				}			
 				/*else if(pMsg->hWinSrc == buttonFunction_1.btnHandle)
 				{
 					
@@ -217,14 +168,8 @@ static void cbSetWin(WM_MESSAGE * pMsg) {
 					gCfgItems.pwd_reprint_flg = 1;
 					disp_in_file_dir = 1;
 					draw_print_file();
-				}	
-				//lan
-				else if(pMsg->hWinSrc == buttonMachinePara.btnHandle)
-              	 {
-	                    last_disp_state = SET_UI;
-	                    Clear_Set();
-	                    draw_MachinePara();
-	             }									
+				}			
+				
 			}
 			break;
 			
@@ -259,51 +204,22 @@ void draw_Set()
 	GUI_DispStringAt(creat_title_text(), TITLE_XPOS, TITLE_YPOS);
 	hSetWnd = WM_CreateWindow(0, titleHeight, LCD_WIDTH, imgHeight, WM_CF_SHOW, cbSetWin, 0);
 
-	buttonMachinePara.btnHandle = BUTTON_CreateEx(INTERVAL_V, 0,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 301);
+	buttonzoffset.btnHandle = BUTTON_CreateEx(INTERVAL_V, 0,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 301);
 	buttonWifi.btnHandle  = BUTTON_CreateEx(BTN_X_PIXEL+INTERVAL_V*2, 0,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 303);
 	buttonFan.btnHandle = BUTTON_CreateEx(BTN_X_PIXEL*2+INTERVAL_V*3,  0,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 304);
 	buttonAbout.btnHandle = BUTTON_CreateEx(BTN_X_PIXEL*3+INTERVAL_V*4,  0,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 305);
-	#if defined(TFT35)
-	if(gCfgItems.display_style == 0)
-	#endif
-	{
-		buttonFunction_1.btnHandle = 0;
-		buttonFilamentChange.btnHandle  = BUTTON_CreateEx(INTERVAL_V,  BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 306);
-		buttonBreakpoint.btnHandle  =  BUTTON_CreateEx(BTN_X_PIXEL+INTERVAL_V*2, BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL,hSetWnd, BUTTON_CF_SHOW, 0, 302);//alloc_win_id());
-		if(gCfgItems.multiple_language !=0)
-		{
-			buttonLanguage.btnHandle = BUTTON_CreateEx(BTN_X_PIXEL*2+INTERVAL_V*3, BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL,hSetWnd, BUTTON_CF_SHOW, 0, 307);//alloc_win_id());
-		}
-		/*
-		if(gCfgItems.func_btn1_display_flag != 0)
-		{
-			buttonFunction_1.btnHandle = BUTTON_CreateEx(BTN_X_PIXEL*2+INTERVAL_V*3, BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL,hSetWnd, BUTTON_CF_SHOW, 0, 302);//alloc_win_id());
-		}
-		*/	
-	}
-	#if defined(TFT35)
-	else
-	{
-		buttonFilamentChange.btnHandle=0;
-		buttonBreakpoint.btnHandle  = BUTTON_CreateEx(INTERVAL_V,  BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 306);
-		buttonFunction_1.btnHandle  =  BUTTON_CreateEx(BTN_X_PIXEL+INTERVAL_V*2, BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL,hSetWnd, BUTTON_CF_SHOW, 0, 302);//alloc_win_id());
-		if(gCfgItems.multiple_language !=0)
-		{
-			buttonLanguage.btnHandle = BUTTON_CreateEx(BTN_X_PIXEL*2+INTERVAL_V*3, BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL,hSetWnd, BUTTON_CF_SHOW, 0, 307);//alloc_win_id());
-		}		
-	}
-	#endif
 	buttonRet.btnHandle  = BUTTON_CreateEx(BTN_X_PIXEL*3+INTERVAL_V*4,  BTN_Y_PIXEL+INTERVAL_H,BTN_X_PIXEL, BTN_Y_PIXEL, hSetWnd, BUTTON_CF_SHOW, 0, 308);
 
 	
 #if VERSION_WITH_PIC	
 
-	BUTTON_SetBmpFileName(buttonMachinePara.btnHandle, "bmp_machine_para.bin",1);
+
+
+	BUTTON_SetBmpFileName(buttonzoffset.btnHandle, "bmp_zoffset.bin",1);
 	BUTTON_SetBmpFileName(buttonWifi.btnHandle, "bmp_wifi.bin",1);
 	BUTTON_SetBmpFileName(buttonFan.btnHandle, "bmp_fan.bin",1);
 	BUTTON_SetBmpFileName(buttonAbout.btnHandle, "bmp_about.bin",1);
-	BUTTON_SetBmpFileName(buttonFilamentChange.btnHandle, "bmp_filament.bin",1);
-	BUTTON_SetBmpFileName(buttonBreakpoint.btnHandle, "bmp_breakpoint.bin",1);
+	
 	#if defined(TFT35)
 	if(gCfgItems.display_style != 0)
 		BUTTON_SetBmpFileName(buttonFunction_1.btnHandle, "bmp_function1.bin",1);
@@ -312,12 +228,10 @@ void draw_Set()
 	
 	BUTTON_SetBmpFileName(buttonRet.btnHandle, "bmp_return.bin",1);
 
-	BUTTON_SetBitmapEx(buttonMachinePara.btnHandle, 0, &bmp_struct, BMP_PIC_X, BMP_PIC_Y);
+	BUTTON_SetBitmapEx(buttonzoffset.btnHandle, 0, &bmp_struct, BMP_PIC_X, BMP_PIC_Y);
 	BUTTON_SetBitmapEx(buttonWifi.btnHandle, 0, &bmp_struct, BMP_PIC_X, BMP_PIC_Y);
 	BUTTON_SetBitmapEx(buttonFan.btnHandle, 0, &bmp_struct,BMP_PIC_X, BMP_PIC_Y);
 	BUTTON_SetBitmapEx(buttonAbout.btnHandle, 0, &bmp_struct, BMP_PIC_X, BMP_PIC_Y);
-	BUTTON_SetBitmapEx(buttonFilamentChange.btnHandle, 0, &bmp_struct, BMP_PIC_X, BMP_PIC_Y);
-	BUTTON_SetBitmapEx(buttonBreakpoint.btnHandle, 0, &bmp_struct, BMP_PIC_X, BMP_PIC_Y);
 	#if defined(TFT35)
 	if(gCfgItems.display_style != 0)
 		BUTTON_SetBitmapEx(buttonFunction_1.btnHandle, 0, &bmp_struct,BMP_PIC_X, BMP_PIC_Y);
@@ -325,18 +239,14 @@ void draw_Set()
 	BUTTON_SetBitmapEx(buttonLanguage.btnHandle, 0, &bmp_struct, BMP_PIC_X, BMP_PIC_Y);
 	BUTTON_SetBitmapEx(buttonRet.btnHandle, 0, &bmp_struct,BMP_PIC_X, BMP_PIC_Y);
 
-	BUTTON_SetBkColor(buttonMachinePara.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_color);
-	BUTTON_SetBkColor(buttonMachinePara.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_color);	
+	BUTTON_SetBkColor(buttonzoffset.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_color);
+	BUTTON_SetBkColor(buttonzoffset.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_color);	
 	BUTTON_SetBkColor(buttonWifi.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_color);
 	BUTTON_SetBkColor(buttonWifi.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_color);
 	BUTTON_SetBkColor(buttonFan.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_color);
 	BUTTON_SetBkColor(buttonFan.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_color);
-	BUTTON_SetBkColor(buttonFilamentChange.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_color);
-	BUTTON_SetBkColor(buttonFilamentChange.btnHandle,BUTTON_CI_UNPRESSED, gCfgItems.btn_color);
 	BUTTON_SetBkColor(buttonAbout.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_color);
 	BUTTON_SetBkColor(buttonAbout.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_color);
-	BUTTON_SetBkColor(buttonBreakpoint.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_color);
-	BUTTON_SetBkColor(buttonBreakpoint.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_color);
 	#if defined(TFT35)
 	if(gCfgItems.display_style != 0)
 	{
@@ -349,18 +259,14 @@ void draw_Set()
 	BUTTON_SetBkColor(buttonRet.btnHandle, BUTTON_CI_PRESSED, gCfgItems.back_btn_color);
 	BUTTON_SetBkColor(buttonRet.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.back_btn_color);	
 	
-	BUTTON_SetTextColor(buttonMachinePara.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_textcolor);
-	BUTTON_SetTextColor(buttonMachinePara.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_textcolor);
+	BUTTON_SetTextColor(buttonzoffset.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_textcolor);
+	BUTTON_SetTextColor(buttonzoffset.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_textcolor);
 	BUTTON_SetTextColor(buttonWifi.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_textcolor);
 	BUTTON_SetTextColor(buttonWifi.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_textcolor);
 	BUTTON_SetTextColor(buttonFan.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_textcolor);
 	BUTTON_SetTextColor(buttonFan.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_textcolor);
-	BUTTON_SetTextColor(buttonFilamentChange.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_textcolor);
-	BUTTON_SetTextColor(buttonFilamentChange.btnHandle,BUTTON_CI_UNPRESSED, gCfgItems.btn_textcolor);
 	BUTTON_SetTextColor(buttonAbout.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_textcolor);
 	BUTTON_SetTextColor(buttonAbout.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_textcolor);
-	BUTTON_SetTextColor(buttonBreakpoint.btnHandle, BUTTON_CI_PRESSED, gCfgItems.btn_textcolor);
-	BUTTON_SetTextColor(buttonBreakpoint.btnHandle, BUTTON_CI_UNPRESSED, gCfgItems.btn_textcolor);
 	#if defined(TFT35)
 	if(gCfgItems.display_style != 0)
 	{
@@ -375,12 +281,10 @@ void draw_Set()
 	
 	if(gCfgItems.multiple_language != 0)
 	{
-		BUTTON_SetText(buttonMachinePara.btnHandle, set_menu.machine_para);
+		BUTTON_SetText(buttonzoffset.btnHandle, more_menu.zoffset);
 		BUTTON_SetText(buttonWifi.btnHandle, set_menu.wifi);
 		BUTTON_SetText(buttonFan.btnHandle, set_menu.fan);
-		BUTTON_SetText(buttonFilamentChange.btnHandle, set_menu.filament);
 		BUTTON_SetText(buttonAbout.btnHandle, set_menu.about);
-		BUTTON_SetText(buttonBreakpoint.btnHandle, set_menu.breakpoint);
 		#if defined(TFT35)
 		if(gCfgItems.display_style != 0)
 			BUTTON_SetText(buttonFunction_1.btnHandle, set_menu.motoroff);
@@ -388,6 +292,7 @@ void draw_Set()
 		BUTTON_SetText(buttonLanguage.btnHandle, set_menu.language);
 		BUTTON_SetText(buttonRet.btnHandle, common_menu.text_back);
 	}
+
 
 #endif
 
